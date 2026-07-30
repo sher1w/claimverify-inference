@@ -12,7 +12,11 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
 print("Tokenizer loaded")
 
 print("Loading model...")
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
+model = AutoModelForSequenceClassification.from_pretrained(
+    MODEL_PATH,
+    torch_dtype=torch.float16,
+    low_cpu_mem_usage=True
+)
 print("Model loaded")
 
 model.eval()
