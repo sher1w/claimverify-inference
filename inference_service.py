@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
-
+torch.set_num_threads(1)
 app = FastAPI()
 
 MODEL_PATH = "mazarellosherwin/claimverify-indicbert-konkani"
@@ -14,7 +14,7 @@ print("Tokenizer loaded")
 print("Loading model...")
 model = AutoModelForSequenceClassification.from_pretrained(
     MODEL_PATH,
-    torch_dtype=torch.float16,
+    dtype=torch.float16,
     low_cpu_mem_usage=True
 )
 print("Model loaded")
