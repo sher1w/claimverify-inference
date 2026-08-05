@@ -1,25 +1,20 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
-torch.set_num_threads(1)
+from optimum.onnxruntime import ORTModelForSequenceClassification
+from transformers import PreTrainedTokenizerFast
+import numpy as np
+
 app = FastAPI()
 
-MODEL_PATH = "mazarellosherwin/claimverify-indicbert-konkani"
+MODEL_PATH = "mazarellosherwin/claimverify-indicbert-konkani-onnx"
 
 print("Loading tokenizer...")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+tokenizer = PreTrainedTokenizerFast.from_pretrained(MODEL_PATH)
 print("Tokenizer loaded")
 
 print("Loading model...")
-model = AutoModelForSequenceClassification.from_pretrained(
-    MODEL_PATH,
-    dtype=torch.float16,
-    low_cpu_mem_usage=True
-)
+model = ORTModelForSequenceClassification.from_pretrained(MODEL_PATH, file_name="model_quantized.onnx")
 print("Model loaded")
-
-model.eval()
 
 
 class ClaimInput(BaseModel):
@@ -29,11 +24,10 @@ class ClaimInput(BaseModel):
 @app.post("/predict")
 def predict(input: ClaimInput):
     inputs = tokenizer(input.text, truncation=True, padding=True, max_length=128, return_tensors="pt")
-    with torch.no_grad():
-        logits = model(**inputs).logits
-    pred = torch.argmax(logits, dim=1).item()
-    prob = torch.softmax(logits, dim=1)[0][pred].item()
+    outputs = model(**inputs)
+    logits = outputs.logits.detach().numpy()
+    pred = int(np.argmax(logits, axis=1)[0])
+    probs = np.exp(logits) / np.sum(np.exp(logits), axis=1, keepdims=True)
+    confidence = float(probs[0][pred])
     verdict = "FAKE" if pred == 1 else "REAL"
-    return {"verdict": verdict, "confidence": round(prob, 4)}
-
-
+    return {"verdict": verdict, "confidence": round(confidence, 4)}
